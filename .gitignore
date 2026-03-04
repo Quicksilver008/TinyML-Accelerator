@@ -1,2 +1,14 @@
 midsem_sim/results/*.out
 midsem_sim/results/*.vcd
+integration/pcpi_demo/results/*.out
+integration/pcpi_demo/results/*.vcd
+integration/pcpi_demo/results/*.log
+integration/pcpi_demo/results/pcpi_regression_summary.md
+integration/pcpi_demo/results/pcpi_regression_summary.json
+integration/pcpi_demo/results/pcpi_handoff_summary.md
+integration/pcpi_demo/results/cases/*.log
+integration/pcpi_demo/results/cases/*.expected.json
+integration/pcpi_demo/firmware/*.bin
+integration/pcpi_demo/firmware/*.elf
+integration/pcpi_demo/firmware/*.map
+integration/pcpi_demo/firmware/*.dis

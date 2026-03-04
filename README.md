@@ -5,7 +5,9 @@ TinyML-Accelerator is a major project focused on building a TinyML accelerator o
 ## Current Repository Layout
 
 - `RISC-V/`: Vendored Verilog implementation of a 5-stage pipelined RV32I core and related modules.
+- `picorv32/`: Vendored PicoRV32 core from YosysHQ.
 - `midsem_sim/`: Self-contained systolic-array simulation flow for mid-sem evaluation.
+- `integration/pcpi_demo/`: First PicoRV32+PCPI+accelerator integration demo.
 - `README.md`: Top-level project documentation.
 
 ## Vendored RISC-V Core
@@ -36,9 +38,12 @@ Based on the upstream README, the core includes:
 ## Core Integration Status
 
 - Accelerator is currently validated in standalone RTL simulation (`midsem_sim`).
-- CPU-core integration is **not implemented yet**.
-- No assembly or machine-code-driven custom instruction path has been tested yet.
-- No replacement core (for example PicoRV32) has been added yet.
+- PicoRV32 is vendored and available in-repo (`picorv32/`).
+- A first CPU integration milestone is implemented in simulation via PCPI (`integration/pcpi_demo`).
+- Custom instruction path is tested with machine-code loaded directly in testbench memory.
+- PCPI demo now uses matrix base pointers (rs1/rs2), reads A/B from memory, and writes C buffer back to memory.
+- Firmware scaffold is added (`firmware.S`, linker script, Makefile, hex generation path) with fallback hex support when toolchain is unavailable.
+- Full board deployment is still pending.
 
 ## Planned Core Integration Path
 
@@ -61,3 +66,44 @@ Generated artifacts:
 
 - `midsem_sim/results/sim_output.log`
 - `midsem_sim/results/MIDSEM_RESULTS.md`
+
+## PCPI Integration Demo Quick Start
+
+Run from repository root:
+
+```powershell
+.\integration\pcpi_demo\scripts\run_pcpi_demo.ps1
+```
+
+Generated artifacts:
+
+- `integration/pcpi_demo/results/pcpi_demo.log`
+- `integration/pcpi_demo/results/pcpi_demo_wave.vcd`
+
+## PCPI 8-Case Regression Quick Start
+
+Run from repository root:
+
+```powershell
+.\integration\pcpi_demo\scripts\run_pcpi_regression.ps1
+```
+
+Generated artifacts:
+
+- `integration/pcpi_demo/results/cases/*.log`
+- `integration/pcpi_demo/results/pcpi_regression_summary.md`
+- `integration/pcpi_demo/results/pcpi_regression_summary.json`
+
+## PCPI Handoff Validation Quick Start
+
+Run from repository root:
+
+```powershell
+.\integration\pcpi_demo\scripts\run_pcpi_handoff.ps1
+```
+
+Generated artifacts:
+
+- `integration/pcpi_demo/results/pcpi_handoff.log`
+- `integration/pcpi_demo/results/pcpi_handoff_wave.vcd`
+- `integration/pcpi_demo/results/pcpi_handoff_summary.md`
