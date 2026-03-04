@@ -136,6 +136,39 @@ Regression script automatically uses:
 2. otherwise WSL fallback
 3. fails clearly if neither path is available
 
+## Dependency Checklist (For New Collaborators)
+
+Install these before running scripts:
+
+1. `git`
+2. `PowerShell`
+3. `iverilog` + `vvp`
+4. `python` (Python 3)
+5. `gtkwave` (optional, for waveform viewing)
+
+For firmware rebuild (regression + handoff):
+
+Option A (native Windows):
+1. `riscv64-unknown-elf-gcc`
+2. `riscv64-unknown-elf-objcopy`
+3. `make`
+
+Option B (WSL Ubuntu fallback):
+```bash
+sudo apt-get update
+sudo apt-get install -y gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf make python3
+```
+
+Quick verify:
+
+```powershell
+git --version
+iverilog -V
+vvp -V
+python --version
+wsl bash -lc "riscv64-unknown-elf-gcc --version | head -n 1"
+```
+
 ## Commands That Should Work Now
 
 From repo root (`TinyML-Accelerator`):

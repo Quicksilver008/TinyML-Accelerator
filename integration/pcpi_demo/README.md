@@ -6,6 +6,43 @@ This demo validates an end-to-end integration path:
 - PCPI custom instruction wrapper
 - Existing 4x4 Q5.10 accelerator RTL
 
+## Dependencies (Collaborator Setup)
+
+Minimum required:
+
+1. `iverilog`
+2. `vvp`
+3. `python` (Python 3)
+4. `PowerShell` (for `*.ps1` scripts)
+
+Optional (waveforms):
+
+1. `gtkwave`
+
+Firmware rebuild toolchain (required for regression and handoff flows):
+
+Option A: Native Windows toolchain:
+
+1. `riscv64-unknown-elf-gcc`
+2. `riscv64-unknown-elf-objcopy`
+3. `make`
+
+Option B: WSL Ubuntu fallback:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf make python3
+```
+
+Tool verify:
+
+```powershell
+iverilog -V
+vvp -V
+python --version
+wsl bash -lc "riscv64-unknown-elf-gcc --version | head -n 1"
+```
+
 ## What It Proves
 
 1. Core issues a custom instruction on PCPI.

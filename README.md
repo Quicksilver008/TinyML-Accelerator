@@ -10,6 +10,43 @@ TinyML-Accelerator is a major project focused on building a TinyML accelerator o
 - `integration/pcpi_demo/`: First PicoRV32+PCPI+accelerator integration demo.
 - `README.md`: Top-level project documentation.
 
+## Dependencies (Install Before Running)
+
+Required for all simulation flows:
+
+1. `git`
+2. `PowerShell` (Windows)
+3. `iverilog` and `vvp` (Icarus Verilog)
+4. `python` (Python 3)
+
+Recommended for waveform inspection:
+
+1. `gtkwave`
+
+Required for firmware rebuild (PCPI regression/handoff):
+
+Option A: Native toolchain on Windows:
+1. `riscv64-unknown-elf-gcc`
+2. `riscv64-unknown-elf-objcopy`
+3. `make`
+
+Option B: WSL fallback (Ubuntu), used by scripts when native toolchain is missing:
+```bash
+sudo apt-get update
+sudo apt-get install -y gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf make python3
+```
+
+Quick verify commands:
+
+```powershell
+git --version
+iverilog -V
+vvp -V
+python --version
+gtkwave --version
+wsl bash -lc "riscv64-unknown-elf-gcc --version | head -n 1"
+```
+
 ## Vendored RISC-V Core
 
 This repository currently includes the upstream core as a vendor copy (not a submodule):
