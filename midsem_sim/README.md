@@ -20,7 +20,19 @@ Artifacts generated:
 - `midsem_sim/results/sim_output.log`
 - `midsem_sim/results/MIDSEM_RESULTS.md`
 
+## RISC-V Integration Stub Run (Custom Instruction Bridge)
+
+```powershell
+.\midsem_sim\scripts\run_riscv_integration_sim.ps1
+```
+
+Artifacts generated:
+
+- `midsem_sim/results/riscv_integration_sim_output.log`
+- `midsem_sim/results/RISCV_INTEGRATION_RESULTS.md`
+
 ## Notes
 
 - This flow targets simulation evidence for mid-sem review.
 - Speedup values in the markdown are analytic estimates based on a scalar software cycle model and should be replaced by measured hardware timings in later phases.
+- The integration stub flow validates custom instruction decode and `start/busy/done` handshake behavior before full CPU pipeline hookup.

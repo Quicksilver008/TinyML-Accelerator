@@ -1,6 +1,6 @@
 # Codex Handoff Prompt (Resume File)
 
-Last updated: 2026-02-28
+Last updated: 2026-03-04
 
 Use this file to resume work with Codex without losing context.
 
@@ -76,6 +76,21 @@ Reported in:
   - `midsem_sim/results/*.out`
   - `midsem_sim/results/*.vcd`
 
+### 6. RISC-V custom-instruction integration stub (new)
+
+Added a simulation-only bridge path under `midsem_sim`:
+
+- RTL:
+  - `midsem_sim/rtl/riscv_matmul_bridge.v`
+  - `midsem_sim/rtl/riscv_accel_integration_stub.v`
+- Testbench:
+  - `midsem_sim/tb/tb_riscv_accel_integration.v`
+- Scripts:
+  - `midsem_sim/scripts/run_riscv_integration_sim.ps1`
+  - `midsem_sim/scripts/summarize_riscv_integration_results.py`
+
+Purpose: validate custom instruction decode match and `start/busy/done` handshake with the existing accelerator before full CPU core hookup.
+
 ## Important Clarification
 
 - A **new replacement RISC-V core has NOT been cloned yet**.
@@ -85,7 +100,7 @@ Reported in:
 ## Core Integration Status (Explicit)
 
 - Standalone accelerator simulation: done and passing.
-- Custom instruction path from CPU: not done.
+- Custom instruction path from CPU: integration stub done (simulation-level bridge), full pipeline hookup not done.
 - Assembly/machine-code driven integration test: not done.
 - Hardware deployment on Pynq-Z2: not started.
 
@@ -113,6 +128,17 @@ Output artifacts:
 - `midsem_sim/results/sim_output.log`
 - `midsem_sim/results/MIDSEM_RESULTS.md`
 
+For custom-instruction integration stub simulation:
+
+```powershell
+.\midsem_sim\scripts\run_riscv_integration_sim.ps1
+```
+
+Output artifacts:
+
+- `midsem_sim/results/riscv_integration_sim_output.log`
+- `midsem_sim/results/RISCV_INTEGRATION_RESULTS.md`
+
 ## Known Limitations / Gaps
 
 1. Speedup values in `MIDSEM_RESULTS.md` are analytic model estimates, not hardware-measured.
@@ -123,21 +149,16 @@ Output artifacts:
 
 ## Immediate Next Tasks (Priority Order)
 
-1. Core strategy decision
-- Prefer a proven integration-ready core (recommended: PicoRV32) for custom instruction/coproc handshake.
-- Keep current vendored `RISC-V/` as reference only unless needed.
+1. Move from integration stub to real core decode stream
+- Feed bridge from an actual RV32 core fetch/decode path instead of direct TB stimulus.
+- Keep the same custom instruction contract for continuity.
 
-2. Integration simulation (before FPGA)
-- Wrap accelerator with clean `start/busy/done` interface.
-- Connect to chosen core via custom instruction path in simulation.
-- Add integration testbench to validate instruction trigger and stall behavior.
-
-3. Benchmark methodology hardening
+2. Benchmark methodology hardening
 - Define fixed matrix sizes and trial counts.
 - Separate compute-only vs end-to-end (data movement included).
 - Keep cycle metrics comparable across ARM baseline and accelerator path.
 
-4. Repo cleanup
+3. Repo cleanup
 - Add additional ignore rules for transient files from vendored RISC-V sims.
 - Optionally remove non-source simulator artifacts from tracked content in a dedicated cleanup commit (coordinate with team first).
 

@@ -36,8 +36,9 @@ Based on the upstream README, the core includes:
 ## Core Integration Status
 
 - Accelerator is currently validated in standalone RTL simulation (`midsem_sim`).
-- CPU-core integration is **not implemented yet**.
-- No assembly or machine-code-driven custom instruction path has been tested yet.
+- A custom-instruction integration **stub simulation** is now added in `midsem_sim` (decode + handshake + accelerator hookup).
+- Full CPU pipeline integration is **not implemented yet**.
+- No assembly-program-driven end-to-end execution has been tested yet.
 - No replacement core (for example PicoRV32) has been added yet.
 
 ## Planned Core Integration Path
@@ -48,6 +49,19 @@ Based on the upstream README, the core includes:
 4. Build CPU+accelerator simulation testbench and verify correctness plus stall behavior.
 5. Replace analytic speedup estimates with measured cycle counts (`mcycle` / ARM timing).
 6. Move to Vivado/Pynq-Z2 hardware integration after simulation sign-off.
+
+## RISC-V Integration Stub Quick Start
+
+Run from repository root:
+
+```powershell
+.\midsem_sim\scripts\run_riscv_integration_sim.ps1
+```
+
+Generated artifacts:
+
+- `midsem_sim/results/riscv_integration_sim_output.log`
+- `midsem_sim/results/RISCV_INTEGRATION_RESULTS.md`
 
 ## Midsem Simulation Quick Start
 
