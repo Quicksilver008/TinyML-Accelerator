@@ -335,6 +335,8 @@ Note: summary and per-case expected JSON are currently ignored via `.gitignore`.
    - `codex_prompt.md`
    - `mentor_progress_update.txt`
    - `integration/pcpi_demo/TEST_RESULTS_SUMMARY.md`
+10. Full beginner-friendly operation guide:
+    - `user_doc/MIDSEM_COMPLETE_PROJECT_GUIDE.md`
 
 ## Immediate Next Work (Do In Order)
 

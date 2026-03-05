@@ -1,0 +1,29 @@
+[*]
+[*] GTKWave Analyzer v3.3.118
+[dumpfile] "integration/pcpi_demo/results/pcpi_handoff_wave.vcd"
+[dumpfile_mtime] "0"
+[savefile] "user_doc/gtkwave/pcpi_handoff_signals.gtkw"
+[timestart] 0
+[size] 1920 1030
+[pos] -1 -1
+[sst_width] 320
+[signals_width] 260
+[sst_expanded] 1
+[sst_vpaned_height] 320
+@28
+tb_picorv32_pcpi_handoff.clk
+tb_picorv32_pcpi_handoff.resetn
+tb_picorv32_pcpi_handoff.pcpi_valid
+tb_picorv32_pcpi_handoff.pcpi_insn[31:0]
+tb_picorv32_pcpi_handoff.pcpi_wait
+tb_picorv32_pcpi_handoff.pcpi_ready
+tb_picorv32_pcpi_handoff.pcpi_wr
+tb_picorv32_pcpi_handoff.pcpi_rd[31:0]
+tb_picorv32_pcpi_handoff.accel_mem_valid
+tb_picorv32_pcpi_handoff.accel_mem_we
+tb_picorv32_pcpi_handoff.accel_mem_addr[31:0]
+tb_picorv32_pcpi_handoff.accel_mem_wdata[31:0]
+tb_picorv32_pcpi_handoff.mem_valid
+tb_picorv32_pcpi_handoff.mem_addr[31:0]
+tb_picorv32_pcpi_handoff.mem_wdata[31:0]
+tb_picorv32_pcpi_handoff.mem_wstrb[3:0]

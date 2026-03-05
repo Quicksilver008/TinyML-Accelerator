@@ -215,6 +215,8 @@ This generates estimated normal-core vs accelerator scaling tables (ideal and ov
    - `integration/pcpi_demo/TEST_RESULTS_SUMMARY.md`
 5. Mentor-facing progress brief is maintained at:
    - `mentor_progress_update.txt`
+6. Beginner-to-advanced full project walkthrough is maintained at:
+   - `user_doc/MIDSEM_COMPLETE_PROJECT_GUIDE.md`
 
 Generated artifacts:
 
