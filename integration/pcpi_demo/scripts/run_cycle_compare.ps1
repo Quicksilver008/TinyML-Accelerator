@@ -8,11 +8,13 @@ $fwDir = Join-Path $demoDir "firmware"
 $tbDir = Join-Path $demoDir "tb"
 $testsDir = Join-Path $demoDir "tests"
 $resultsDir = Join-Path $demoDir "results"
+$flowLockPath = Join-Path $fwDir ".firmware_flow.lock"
 
 New-Item -ItemType Directory -Force $resultsDir | Out-Null
 
 $accelLog = Join-Path $resultsDir "pcpi_cycle_accel.log"
-$swLog = Join-Path $resultsDir "pcpi_cycle_sw.log"
+$swNoMulLog = Join-Path $resultsDir "pcpi_cycle_sw_nomul.log"
+$swMulLog = Join-Path $resultsDir "pcpi_cycle_sw_mul.log"
 $summaryMd = Join-Path $resultsDir "pcpi_cycle_compare_summary.md"
 $summaryJson = Join-Path $resultsDir "pcpi_cycle_compare_summary.json"
 
@@ -20,6 +22,29 @@ $casesFile = Join-Path $testsDir "cases.json"
 $generator = Join-Path $testsDir "gen_case_firmware.py"
 $firmwareS = Join-Path $fwDir "firmware.S"
 $metaOut = Join-Path $resultsDir "pcpi_cycle_compare_identity.expected.json"
+
+function Acquire-FlowLock {
+    param(
+        [string]$Path,
+        [int]$TimeoutSeconds = 300
+    )
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            # Keep an exclusive handle until script exit to prevent concurrent firmware rewrites.
+            $script:flowLockHandle = [System.IO.File]::Open(
+                $Path,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None
+            )
+            return
+        } catch {
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    throw "Timed out waiting for firmware flow lock: $Path"
+}
 
 function Convert-ToWslPath {
     param([string]$WindowsPath)
@@ -30,6 +55,8 @@ function Convert-ToWslPath {
     }
     throw "Failed to convert path to WSL: $WindowsPath"
 }
+
+Acquire-FlowLock -Path $flowLockPath
 
 function Test-WslToolchain {
     & wsl bash -lc "command -v riscv64-unknown-elf-gcc >/dev/null 2>&1 && command -v make >/dev/null 2>&1"
@@ -60,13 +87,14 @@ function Prepare-IdentityAccelCase {
 function Build-Firmware {
     param(
         [string]$SourceFileName,
-        [int]$Words
+        [int]$Words,
+        [string]$Arch = "rv32i"
     )
 
     $nativeToolchain = Get-Command riscv64-unknown-elf-gcc -ErrorAction SilentlyContinue
     if ($nativeToolchain) {
-        Write-Host "Using native Windows RISC-V toolchain for $SourceFileName."
-        & make -C $fwDir clean all "FIRMWARE_SRC=$SourceFileName" "WORDS=$Words"
+        Write-Host "Using native Windows RISC-V toolchain for $SourceFileName (ARCH=$Arch)."
+        & make -C $fwDir clean all "FIRMWARE_SRC=$SourceFileName" "WORDS=$Words" "ARCH=$Arch"
         if ($LASTEXITCODE -ne 0) {
             throw "Native firmware build failed for $SourceFileName with exit code $LASTEXITCODE"
         }
@@ -75,9 +103,9 @@ function Build-Firmware {
 
     $wslCmd = Get-Command wsl -ErrorAction SilentlyContinue
     if ($wslCmd -and (Test-WslToolchain)) {
-        Write-Host "Using WSL RISC-V toolchain fallback for $SourceFileName."
+        Write-Host "Using WSL RISC-V toolchain fallback for $SourceFileName (ARCH=$Arch)."
         $fwDirWsl = Convert-ToWslPath $fwDir
-        & wsl bash -lc "cd '$fwDirWsl' && make clean all PYTHON=python3 FIRMWARE_SRC=$SourceFileName WORDS=$Words"
+        & wsl bash -lc "cd '$fwDirWsl' && make clean all PYTHON=python3 FIRMWARE_SRC=$SourceFileName WORDS=$Words ARCH=$Arch"
         if ($LASTEXITCODE -ne 0) {
             throw "WSL firmware build failed for $SourceFileName with exit code $LASTEXITCODE"
         }
@@ -93,7 +121,8 @@ function Run-Sim {
         [string]$FirmwareSrc,
         [string]$TbFile,
         [string]$LogFile,
-        [int]$FirmwareWords
+        [int]$FirmwareWords,
+        [string]$Arch = "rv32i"
     )
 
     $simExe = Join-Path $resultsDir ("{0}.out" -f $Name)
@@ -107,7 +136,7 @@ function Run-Sim {
         (Join-Path $tbDir $TbFile)
     )
 
-    Build-Firmware -SourceFileName $FirmwareSrc -Words $FirmwareWords
+    Build-Firmware -SourceFileName $FirmwareSrc -Words $FirmwareWords -Arch $Arch
 
     Write-Host "Compiling $Name testbench..."
     & iverilog -g2012 -o $simExe @sources
@@ -132,25 +161,44 @@ function Get-CycleCountFromLog {
 }
 
 Prepare-IdentityAccelCase
-Run-Sim -Name "pcpi_cycle_accel" -FirmwareSrc "firmware.S" -TbFile "tb_picorv32_pcpi_tinyml.v" -LogFile $accelLog -FirmwareWords 256
-Run-Sim -Name "pcpi_cycle_sw" -FirmwareSrc "firmware_sw_matmul.c" -TbFile "tb_picorv32_sw_matmul.v" -LogFile $swLog -FirmwareWords 1024
+Run-Sim -Name "pcpi_cycle_accel" -FirmwareSrc "firmware.S" -TbFile "tb_picorv32_pcpi_tinyml.v" -LogFile $accelLog -FirmwareWords 256 -Arch "rv32i"
+Run-Sim -Name "pcpi_cycle_sw_nomul" -FirmwareSrc "firmware_sw_matmul.c" -TbFile "tb_picorv32_sw_matmul.v" -LogFile $swNoMulLog -FirmwareWords 1024 -Arch "rv32i"
+Run-Sim -Name "pcpi_cycle_sw_mul" -FirmwareSrc "firmware_sw_matmul.c" -TbFile "tb_picorv32_sw_matmul_mul.v" -LogFile $swMulLog -FirmwareWords 1024 -Arch "rv32im"
 
 $accelCycles = Get-CycleCountFromLog -LogFile $accelLog
-$swCycles = Get-CycleCountFromLog -LogFile $swLog
+$swNoMulCycles = Get-CycleCountFromLog -LogFile $swNoMulLog
+$swMulCycles = Get-CycleCountFromLog -LogFile $swMulLog
 
 if ($accelCycles -le 0) {
     throw "Invalid accelerator cycle count: $accelCycles"
 }
+$speedupSwNoMulOverAccel = [double]$swNoMulCycles / [double]$accelCycles
+$speedupSwMulOverAccel = [double]$swMulCycles / [double]$accelCycles
 
-$speedup = [double]$swCycles / [double]$accelCycles
+if ($swMulCycles -le 0) {
+    throw "Invalid software (MUL-enabled) cycle count: $swMulCycles"
+}
+$swMulBenefit = [double]$swNoMulCycles / [double]$swMulCycles
 
 $summary = [ordered]@{
     generated_at_utc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     accel_cycles = $accelCycles
-    sw_cycles = $swCycles
-    speedup_sw_over_accel = [Math]::Round($speedup, 4)
+    sw_nomul_cycles = $swNoMulCycles
+    sw_mul_cycles = $swMulCycles
+    speedup_sw_nomul_over_accel = [Math]::Round($speedupSwNoMulOverAccel, 4)
+    speedup_sw_mul_over_accel = [Math]::Round($speedupSwMulOverAccel, 4)
+    speedup_sw_nomul_over_sw_mul = [Math]::Round($swMulBenefit, 4)
+    assumptions = [ordered]@{
+        accel_core = "PicoRV32 PCPI path (ENABLE_PCPI=1, ENABLE_MUL=0, ENABLE_FAST_MUL=0)"
+        sw_nomul_core = "PicoRV32 baseline (ENABLE_PCPI=0, ENABLE_MUL=0, ENABLE_FAST_MUL=0)"
+        sw_mul_core = "PicoRV32 baseline (ENABLE_PCPI=0, ENABLE_MUL=1, ENABLE_FAST_MUL=0)"
+        sw_nomul_arch = "rv32i"
+        sw_mul_arch = "rv32im"
+        accel_arch = "rv32i"
+    }
     accel_log = "integration/pcpi_demo/results/pcpi_cycle_accel.log"
-    sw_log = "integration/pcpi_demo/results/pcpi_cycle_sw.log"
+    sw_nomul_log = "integration/pcpi_demo/results/pcpi_cycle_sw_nomul.log"
+    sw_mul_log = "integration/pcpi_demo/results/pcpi_cycle_sw_mul.log"
 }
 
 $summary | ConvertTo-Json -Depth 6 | Set-Content -Path $summaryJson -Encoding UTF8
@@ -160,14 +208,30 @@ $md += "# PCPI Cycle Comparison Summary"
 $md += ""
 $md += "- Generated (UTC): $($summary.generated_at_utc)"
 $md += "- Accelerator cycles: $($summary.accel_cycles)"
-$md += "- Software cycles: $($summary.sw_cycles)"
-$md += "- Speedup (software / accelerator): $($summary.speedup_sw_over_accel)x"
+$md += "- Software cycles (no MUL, rv32i): $($summary.sw_nomul_cycles)"
+$md += "- Software cycles (MUL enabled, rv32im): $($summary.sw_mul_cycles)"
+$md += "- Speedup (SW no-MUL / accelerator): $($summary.speedup_sw_nomul_over_accel)x"
+$md += "- Speedup (SW MUL / accelerator): $($summary.speedup_sw_mul_over_accel)x"
+$md += "- SW MUL benefit (SW no-MUL / SW MUL): $($summary.speedup_sw_nomul_over_sw_mul)x"
+$md += ""
+$md += "| Path | Core Config | Firmware Arch | Cycles | Relative To Accelerator |"
+$md += "| --- | --- | --- | ---: | ---: |"
+$md += "| Accelerator custom instruction | ENABLE_PCPI=1, ENABLE_MUL=0 | rv32i | $($summary.accel_cycles) | 1.0000x |"
+$md += "| Software baseline (no MUL) | ENABLE_PCPI=0, ENABLE_MUL=0 | rv32i | $($summary.sw_nomul_cycles) | $($summary.speedup_sw_nomul_over_accel)x |"
+$md += "| Software baseline (MUL enabled) | ENABLE_PCPI=0, ENABLE_MUL=1 | rv32im | $($summary.sw_mul_cycles) | $($summary.speedup_sw_mul_over_accel)x |"
 $md += ""
 $md += "Logs:"
 $md += "- $($summary.accel_log)"
-$md += "- $($summary.sw_log)"
+$md += "- $($summary.sw_nomul_log)"
+$md += "- $($summary.sw_mul_log)"
 $md -join "`n" | Set-Content -Path $summaryMd -Encoding UTF8
 
-Write-Host ("CYCLE_COMPARE accel_cycles={0} sw_cycles={1} speedup={2}x" -f $accelCycles, $swCycles, [Math]::Round($speedup, 4))
+Write-Host ("CYCLE_COMPARE accel={0} sw_nomul={1} sw_mul={2} speedup_nomul={3}x speedup_mul={4}x sw_mul_benefit={5}x" -f `
+    $accelCycles, `
+    $swNoMulCycles, `
+    $swMulCycles, `
+    [Math]::Round($speedupSwNoMulOverAccel, 4), `
+    [Math]::Round($speedupSwMulOverAccel, 4), `
+    [Math]::Round($swMulBenefit, 4))
 Write-Host "Summary (md): $summaryMd"
 Write-Host "Summary (json): $summaryJson"

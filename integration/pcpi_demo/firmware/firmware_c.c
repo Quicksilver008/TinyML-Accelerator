@@ -4,8 +4,23 @@ typedef unsigned int uint32_t;
 #define B_BASE_WORD_ADDR 0x140u
 #define C_BASE_WORD_ADDR 0x200u
 
-// custom-0 matmul with funct7=0101010, funct3=000, rd=x3, rs1=x1, rs2=x2
-#define PCPI_MATMUL_X3_X1_X2() __asm__ volatile (".word 0x5420818b")
+static void pcpi_matmul_with_fixed_regs(uint32_t a_base, uint32_t b_base) {
+    __asm__ volatile (
+        // Preserve ABI-critical registers clobbered by the fixed encoding.
+        "mv t0, ra\n"
+        "mv t1, sp\n"
+        "mv t2, gp\n"
+        "mv ra, %0\n"
+        "mv sp, %1\n"
+        ".word 0x5420818b\n"
+        "mv gp, t2\n"
+        "mv sp, t1\n"
+        "mv ra, t0\n"
+        :
+        : "r"(a_base), "r"(b_base)
+        : "ra", "gp", "t0", "t1", "t2", "memory"
+    );
+}
 
 static const uint32_t a_init[16] = {
     0x00000400u, 0x00000000u, 0x00000000u, 0x00000000u,
@@ -32,11 +47,7 @@ static void run_program(void) {
         b_dst[i] = b_init[i];
     }
 
-    __asm__ volatile (
-        "addi x1, x0, 0x100\n"
-        "addi x2, x0, 0x140\n"
-    );
-    PCPI_MATMUL_X3_X1_X2();
+    pcpi_matmul_with_fixed_regs(A_BASE_WORD_ADDR, B_BASE_WORD_ADDR);
 
     {
         uint32_t c00 = c_src[0];

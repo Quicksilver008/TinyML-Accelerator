@@ -9,6 +9,7 @@ $tbDir = Join-Path $demoDir "tb"
 $testsDir = Join-Path $demoDir "tests"
 $resultsDir = Join-Path $demoDir "results"
 $caseResultsDir = Join-Path $resultsDir "prof_demo_cases"
+$flowLockPath = Join-Path $fwDir ".firmware_flow.lock"
 
 $casesFile = Join-Path $testsDir "professor_demo_cases.json"
 $generator = Join-Path $testsDir "gen_case_firmware.py"
@@ -17,8 +18,33 @@ $simExe = Join-Path $resultsDir "pcpi_prof_demo_tb.out"
 $summaryMd = Join-Path $resultsDir "pcpi_prof_demo_summary.md"
 $summaryJson = Join-Path $resultsDir "pcpi_prof_demo_summary.json"
 
+function Acquire-FlowLock {
+    param(
+        [string]$Path,
+        [int]$TimeoutSeconds = 300
+    )
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            # Keep an exclusive handle until script exit to prevent concurrent firmware rewrites.
+            $script:flowLockHandle = [System.IO.File]::Open(
+                $Path,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None
+            )
+            return
+        } catch {
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    throw "Timed out waiting for firmware flow lock: $Path"
+}
+
 New-Item -ItemType Directory -Force $resultsDir | Out-Null
 New-Item -ItemType Directory -Force $caseResultsDir | Out-Null
+
+Acquire-FlowLock -Path $flowLockPath
 
 function Get-PythonExe {
     $candidates = @("python", "py")

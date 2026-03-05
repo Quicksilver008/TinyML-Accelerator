@@ -8,7 +8,17 @@ integration/pcpi_demo/results/pcpi_regression_summary.json
 integration/pcpi_demo/results/pcpi_handoff_summary.md
 integration/pcpi_demo/results/cases/*.log
 integration/pcpi_demo/results/cases/*.expected.json
+integration/pcpi_demo/results/pcpi_cycle_compare_identity.expected.json
+integration/pcpi_demo/results/pcpi_cycle_compare_summary.md
+integration/pcpi_demo/results/pcpi_cycle_compare_summary.json
+integration/pcpi_demo/results/pcpi_cycle_scaling_estimate.json
+integration/pcpi_demo/results/pcpi_prof_demo_summary.md
+integration/pcpi_demo/results/pcpi_prof_demo_summary.json
+integration/pcpi_demo/results/prof_demo_cases/*.log
+integration/pcpi_demo/results/prof_demo_cases/*.expected.json
 integration/pcpi_demo/firmware/*.bin
 integration/pcpi_demo/firmware/*.elf
 integration/pcpi_demo/firmware/*.map
 integration/pcpi_demo/firmware/*.dis
+integration/pcpi_demo/firmware/.firmware_flow.lock
+pynq_z2_custom_core/build/*.out
