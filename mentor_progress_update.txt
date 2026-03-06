@@ -148,7 +148,7 @@ Important technical note:
 - Updated docs:
   - README.md
   - integration/pcpi_demo/README.md
-  - codex_prompt.md
+  - integration/pcpi_demo/legacy/internal_handoff/project_handoff_context.md
   - integration/pcpi_demo/TEST_RESULTS_SUMMARY.md
   - integration/pcpi_demo/docs/MIDSEM_COMPLETE_PROJECT_GUIDE.md
   - integration/pcpi_demo/simulation/gtkwave/*.gtkw
