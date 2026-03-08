@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TinyML PCPI Visualizer</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-main">
+      <div>
+        <h1>TinyML Accelerator + PicoRV32 Visualizer</h1>
+        <p>System architecture, wrapper FSM, PCPI handshake, and PE-level systolic data movement</p>
+      </div>
+      <button type="button" class="mini-btn mini-btn-info" id="btnAppGuide">App Guide</button>
+    </div>
+  </header>
+
+  <main class="workspace" id="workspace">
+    <section class="panel architecture-panel">
+      <div class="panel-head">
+        <div>
+          <h2>1) System Architecture</h2>
+          <p class="panel-subtitle">System-level view based on <code>pcpi_tinyml_accel.v</code>. Memory is below the wrapper because the wrapper, not the accelerator, owns the <code>accel_mem_*</code> interface.</p>
+        </div>
+        <div class="panel-controls">
+          <button type="button" class="mini-btn" data-control="back">Step Back</button>
+          <button type="button" class="mini-btn" data-control="step">Step</button>
+          <button type="button" class="mini-btn" data-control="run">Run</button>
+          <button type="button" class="mini-btn" data-control="reset">Reset</button>
+          <button type="button" class="mini-btn mini-btn-info" id="btnArchInfo">Architecture Info</button>
+        </div>
+      </div>
+
+      <div class="diagram-wrap">
+        <div class="diagram-canvas">
+          <div class="global-note"><code>clk</code> and <code>resetn</code> fan out to CPU, wrapper, accelerator, and memory model.</div>
+
+          <div class="domain-chip cpu-domain">CPU domain</div>
+          <div class="domain-chip wrapper-domain">Wrapper domain</div>
+          <div class="domain-chip accel-domain">Accelerator domain</div>
+          <div class="domain-chip memory-domain">Memory domain</div>
+
+          <div id="cpuBlock" class="arch-box cpu-box">
+            <div class="box-title-row">
+              <div class="box-title">PicoRV32 Core</div>
+              <button type="button" class="block-info-btn" id="btnCpuInfo">i</button>
+            </div>
+            <div class="box-body">Presents <code>pcpi_valid</code>, <code>pcpi_insn</code>, <code>pcpi_rs1</code>, <code>pcpi_rs2</code>. Stalls while <code>pcpi_wait</code> is high.</div>
+          </div>
+
+          <div id="wrapperBlock" class="arch-box wrapper-box">
+            <div class="box-title">pcpi_tinyml_accel Wrapper</div>
+            <div class="subgrid wrapper-grid">
+              <div id="decodeBlock" class="subblock">
+                <div class="sub-title">Decode + FSM</div>
+                <div class="sub-body"><code>insn_match</code>, <code>state</code>, <code>resp_valid</code></div>
+              </div>
+              <div id="memSeqBlock" class="subblock">
+                <div class="sub-title">Memory Sequencer</div>
+                <div class="sub-body"><code>accel_mem_valid</code>, <code>accel_mem_we</code>, <code>accel_mem_addr</code>, <code>accel_mem_wdata</code></div>
+              </div>
+              <div id="baseBlock" class="subblock">
+                <div class="sub-title">Base + Index</div>
+                <div class="sub-body"><code>base_a</code>, <code>base_b</code>, <code>elem_idx</code></div>
+              </div>
+              <div id="bufferBlock" class="subblock">
+                <div class="sub-title">Operand Buffers</div>
+                <div class="sub-body"><code>a_flat</code>, <code>b_flat</code></div>
+              </div>
+              <div id="respBlock" class="subblock wide-subblock">
+                <div class="sub-title">Response Path</div>
+                <div class="sub-body"><code>result_reg</code> -> <code>pcpi_rd</code>, plus <code>pcpi_ready</code> / <code>pcpi_wr</code></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="accelBlock" class="arch-box accel-box">
+            <div class="box-title">matrix_accel_4x4_q5_10</div>
+            <div class="subgrid accel-grid">
+              <div id="accelCtrlBlock" class="subblock accel-subblock">
+                <div class="sub-title">Latch + Control</div>
+                <div class="sub-body"><code>start</code>, <code>busy</code>, <code>done</code>, <code>cycle_count</code>, <code>a_latched</code>, <code>b_latched</code></div>
+              </div>
+              <div id="issueBlock" class="subblock accel-subblock">
+                <div class="sub-title">Issue Logic</div>
+                <div class="sub-body"><code>row_inject_flat</code>, <code>col_inject_flat</code></div>
+              </div>
+              <div id="statusBlock" class="subblock accel-subblock wide-subblock">
+                <div class="sub-title">Result Side</div>
+                <div class="sub-body"><code>c_flat</code>, <code>accel_done</code>, <code>accel_cycle_count</code></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="memoryBlock" class="arch-box memory-box">
+            <div class="box-title">System Memory</div>
+            <div class="box-body">Wrapper reads A/B and writes C through the shared memory path.</div>
+            <div class="memory-list">
+              <div><code>A @ base_a</code></div>
+              <div><code>B @ base_b</code></div>
+              <div><code>C @ 0x0000_0200</code></div>
+            </div>
+          </div>
+
+          <svg class="arch-svg" viewBox="0 0 1260 720" preserveAspectRatio="xMinYMin meet">
+            <defs>
+              <marker id="arrowPcpi" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 z" fill="#2563eb"></path>
+              </marker>
+              <marker id="arrowMemory" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 z" fill="#0f766e"></path>
+              </marker>
+              <marker id="arrowAccel" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                <path d="M0,0 L7,3.5 L0,7 z" fill="#dc2626"></path>
+              </marker>
+            </defs>
+
+            <path id="sigClock" class="sig sig-clock" d="M70 78 H1190"></path>
+            <path id="sigPcpiReq" class="sig sig-pcpi" d="M240 250 H340" marker-end="url(#arrowPcpi)"></path>
+            <path id="sigPcpiResp" class="sig sig-pcpi" d="M340 420 H240" marker-end="url(#arrowPcpi)"></path>
+            <path id="sigAccelStart" class="sig sig-accel" d="M760 250 H860" marker-end="url(#arrowAccel)"></path>
+            <path id="sigAccelPayload" class="sig sig-accel" d="M760 320 H860" marker-end="url(#arrowAccel)"></path>
+            <path id="sigAccelStatus" class="sig sig-accel" d="M860 400 H760" marker-end="url(#arrowAccel)"></path>
+            <path id="sigMemReq" class="sig sig-memory" d="M550 500 V585" marker-end="url(#arrowMemory)"></path>
+            <path id="sigMemResp" class="sig sig-memory" d="M640 585 V500" marker-end="url(#arrowMemory)"></path>
+          </svg>
+
+          <button type="button" class="arrow-info info-pcpi-req" data-signal="sigPcpiReq">i</button>
+          <button type="button" class="arrow-info info-pcpi-resp" data-signal="sigPcpiResp">i</button>
+          <button type="button" class="arrow-info info-accel-start" data-signal="sigAccelStart">i</button>
+          <button type="button" class="arrow-info info-accel-payload" data-signal="sigAccelPayload">i</button>
+          <button type="button" class="arrow-info info-accel-status" data-signal="sigAccelStatus">i</button>
+          <button type="button" class="arrow-info info-mem-req" data-signal="sigMemReq">i</button>
+          <button type="button" class="arrow-info info-mem-resp" data-signal="sigMemResp">i</button>
+
+          <div id="signalPopover" class="signal-popover" hidden>
+            <div id="signalPopoverTitle" class="signal-popover-title"></div>
+            <div id="signalPopoverBody" class="signal-popover-body"></div>
+          </div>
+
+          <div class="legend">
+            <div class="legend-item"><span class="swatch swatch-pcpi"></span>PCPI handshake</div>
+            <div class="legend-item"><span class="swatch swatch-accel"></span>wrapper to accelerator</div>
+            <div class="legend-item"><span class="swatch swatch-memory"></span>wrapper to memory</div>
+            <div class="legend-item"><span class="swatch swatch-active"></span>active in current step</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="splitter splitter-vertical" id="columnSplitter" title="Drag to resize top and bottom columns"></div>
+
+    <section class="panel systolic-panel">
+      <div class="panel-head">
+        <div>
+          <h2>2) Systolic Array View</h2>
+          <p class="panel-subtitle">Top-right panel. Each active PE shows entry and exit values for <code>x</code> and <code>y</code>.</p>
+        </div>
+        <div class="panel-controls">
+          <button type="button" class="mini-btn" data-control="back">Step Back</button>
+          <button type="button" class="mini-btn" data-control="step">Step</button>
+          <button type="button" class="mini-btn" data-control="run">Run</button>
+          <button type="button" class="mini-btn" data-control="reset">Reset</button>
+        </div>
+      </div>
+      <div id="mesh" class="mesh"></div>
+      <p class="systolic-note">For active PE(r,c), the current pair is <code>x_in = A[r][k]</code>, <code>y_in = B[k][c]</code>. Those values are forwarded as <code>x_out</code> and <code>y_out</code> while the PE accumulates the scaled product into <code>z_acc</code>.</p>
+    </section>
+
+    <div class="splitter splitter-horizontal" id="rowSplitter" title="Drag to resize top and bottom rows"></div>
+
+    <section class="panel control-panel">
+      <div class="panel-head">
+        <div>
+          <h2>3) State Transitions</h2>
+          <p class="panel-subtitle">Bottom-left panel. Includes one-step reverse navigation.</p>
+        </div>
+        <div class="panel-controls">
+          <button type="button" class="mini-btn" data-control="back">Step Back</button>
+          <button type="button" class="mini-btn" data-control="step">Step</button>
+          <button type="button" class="mini-btn" data-control="run">Run</button>
+          <button type="button" class="mini-btn" data-control="reset">Reset</button>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="btnRun">Run Full Transaction</button>
+        <button id="btnStepBack">Step Back</button>
+        <button id="btnStep">Step</button>
+        <button id="btnReset">Reset</button>
+      </div>
+      <p class="hint">Flow: IDLE -&gt; LOAD_A -&gt; LOAD_B -&gt; KICK -&gt; WAIT_ACC (10 cycles) -&gt; STORE_C -&gt; RESP -&gt; IDLE</p>
+
+      <div class="detail-grid">
+        <div><strong>State</strong><span id="stateValue">IDLE</span></div>
+        <div><strong>Micro-cycle</strong><span id="cycleValue">0</span></div>
+        <div><strong>WAIT_ACC cycle</strong><span id="waitCycleValue">0 / 10</span></div>
+        <div><strong>insn_match</strong><span id="sigInsnMatch">0</span></div>
+        <div><strong>pcpi_valid</strong><span id="sigValid">0</span></div>
+        <div><strong>pcpi_wait</strong><span id="sigWait">0</span></div>
+        <div><strong>pcpi_ready</strong><span id="sigReady">0</span></div>
+        <div><strong>pcpi_wr</strong><span id="sigWr">0</span></div>
+        <div><strong>pcpi_rd</strong><span id="sigRd">-</span></div>
+        <div><strong>resp_valid</strong><span id="sigRespValid">0</span></div>
+        <div><strong>pcpi_rs1 / base_a</strong><span id="sigRs1">-</span></div>
+        <div><strong>pcpi_rs2 / base_b</strong><span id="sigRs2">-</span></div>
+        <div><strong>elem_idx</strong><span id="sigElemIdx">-</span></div>
+        <div><strong>a_flat status</strong><span id="sigBufA">empty</span></div>
+        <div><strong>b_flat status</strong><span id="sigBufB">empty</span></div>
+        <div><strong>accel_mem_valid</strong><span id="sigMemValid">0</span></div>
+        <div><strong>accel_mem_we</strong><span id="sigMemWe">0</span></div>
+        <div><strong>accel_mem_addr</strong><span id="sigMemAddr">-</span></div>
+        <div><strong>accel_mem_wdata</strong><span id="sigMemWdata">-</span></div>
+        <div><strong>accel_mem_rdata</strong><span id="sigMemRdata">-</span></div>
+        <div><strong>accel_mem_ready</strong><span id="sigMemReady">0</span></div>
+        <div><strong>accel_busy</strong><span id="sigBusy">0</span></div>
+        <div><strong>accel_done</strong><span id="sigDone">0</span></div>
+        <div><strong>accel_cycle_count</strong><span id="sigAccelCycle">0</span></div>
+      </div>
+
+      <div class="state-card">
+        <h3>Current State Meaning</h3>
+        <div id="stateTitle" class="state-title">S_IDLE</div>
+        <p id="stateDesc" class="state-desc">The wrapper is idle. No memory request is active and the CPU is not stalled.</p>
+      </div>
+
+      <h3>Wrapper FSM</h3>
+      <ol id="fsmList" class="fsm">
+        <li data-state="IDLE">S_IDLE</li>
+        <li data-state="LOAD_A">S_LOAD_A</li>
+        <li data-state="LOAD_B">S_LOAD_B</li>
+        <li data-state="KICK">S_KICK</li>
+        <li data-state="WAIT_ACC">S_WAIT_ACC</li>
+        <li data-state="STORE_C">S_STORE_C</li>
+        <li data-state="RESP">S_RESP</li>
+      </ol>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="panel-head">
+        <div>
+          <h2>4) Event Log</h2>
+          <p class="panel-subtitle">Bottom-right panel. Readable trace of the transaction sequence.</p>
+        </div>
+        <div class="panel-controls">
+          <button type="button" class="mini-btn" data-control="back">Step Back</button>
+          <button type="button" class="mini-btn" data-control="step">Step</button>
+          <button type="button" class="mini-btn" data-control="run">Run</button>
+          <button type="button" class="mini-btn" data-control="reset">Reset</button>
+        </div>
+      </div>
+      <pre id="logBox"></pre>
+    </section>
+  </main>
+
+  <div id="archInfoModal" class="modal" hidden>
+    <div class="modal-backdrop" id="archInfoBackdrop"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="archInfoTitle">
+      <div class="modal-head">
+        <h2 id="archInfoTitle">Architecture Info</h2>
+        <button type="button" class="mini-btn" id="btnArchInfoClose">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <h3>Files</h3>
+          <p><code>integration/pcpi_demo/rtl/pcpi_tinyml_accel.v</code> is the wrapper. <code>accel_standalone/rtl/matrix_accel_4x4_q5_10.v</code> is the accelerator top. <code>accel_standalone/rtl/pe_cell_q5_10.v</code> defines the PE multiply-accumulate behavior.</p>
+        </div>
+        <div class="modal-section">
+          <h3>System Contract</h3>
+          <p>The CPU presents one custom instruction. The wrapper decodes it, latches <code>pcpi_rs1 -&gt; base_a</code> and <code>pcpi_rs2 -&gt; base_b</code>, reads 16 A words and 16 B words, starts the accelerator, waits for <code>accel_done</code>, writes 16 C words to <code>0x0000_0200</code>, then returns <code>c00</code> on <code>pcpi_rd</code>.</p>
+        </div>
+        <div class="modal-section">
+          <h3>Instruction Encoding</h3>
+          <p>Wrapper matches a custom instruction with <code>opcode = 7'b0001011</code> (custom-0), <code>funct3 = 3'b000</code>, and <code>funct7 = 7'b0101010</code>.</p>
+        </div>
+        <div class="modal-section">
+          <h3>Fixed-Point Format</h3>
+          <p>Inputs and outputs use Q5.10 fixed point in signed 16-bit values. In each PE, <code>product_full = x_in * y_in</code> and <code>product_q5_10 = product_full &gt;&gt;&gt; 10</code> before accumulation into <code>z_acc</code>.</p>
+        </div>
+        <div class="modal-section">
+          <h3>Timing of the Accelerator Transaction</h3>
+          <p>Wrapper FSM runs <code>S_IDLE -&gt; S_LOAD_A -&gt; S_LOAD_B -&gt; S_KICK -&gt; S_WAIT_ACC -&gt; S_STORE_C -&gt; S_RESP</code>. The accelerator itself is configured for <code>COMPUTE_CYCLES = 10</code> for the 4x4 systolic schedule.</p>
+        </div>
+        <div class="modal-section">
+          <h3>Domains</h3>
+          <ul class="modal-list">
+            <li><strong>CPU domain:</strong> originates <code>pcpi_valid</code>, <code>pcpi_insn</code>, <code>pcpi_rs1</code>, <code>pcpi_rs2</code>.</li>
+            <li><strong>Wrapper domain:</strong> decodes, stalls CPU, reads A/B from memory, kicks accelerator, writes C, returns response.</li>
+            <li><strong>Accelerator domain:</strong> latches operands, issues wavefront, computes <code>c_flat</code>, raises <code>done</code>.</li>
+            <li><strong>Memory domain:</strong> serves wrapper requests through <code>accel_mem_valid/we/addr/wdata/rdata/ready</code>.</li>
+          </ul>
+        </div>
+        <div class="modal-section">
+          <h3>CPU Stall and Handoff</h3>
+          <p>CPU side sees <code>pcpi_wait = 1</code> through load, kick, wait, and store phases. It is released only when the wrapper raises <code>pcpi_ready</code> / <code>pcpi_wr</code> in <code>S_RESP</code>. After that, normal instruction flow resumes. This is the handoff point between accelerator-assisted execution and regular CPU execution.</p>
+        </div>
+        <div class="modal-section">
+          <h3>Key Signal Groups</h3>
+          <ul class="modal-list">
+            <li><strong>PCPI request:</strong> <code>pcpi_valid</code>, <code>pcpi_insn</code>, <code>pcpi_rs1</code>, <code>pcpi_rs2</code></li>
+            <li><strong>PCPI response:</strong> <code>pcpi_wait</code>, <code>pcpi_ready</code>, <code>pcpi_wr</code>, <code>pcpi_rd</code></li>
+            <li><strong>Memory path:</strong> <code>accel_mem_valid</code>, <code>accel_mem_we</code>, <code>accel_mem_addr</code>, <code>accel_mem_wdata</code>, <code>accel_mem_rdata</code>, <code>accel_mem_ready</code></li>
+            <li><strong>Accelerator path:</strong> <code>accel_start</code>, <code>accel_busy</code>, <code>accel_done</code>, <code>c_flat</code>, <code>accel_cycle_count</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cpuInfoModal" class="modal" hidden>
+    <div class="modal-backdrop" id="cpuInfoBackdrop"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="cpuInfoTitle">
+      <div class="modal-head">
+        <h2 id="cpuInfoTitle">CPU Core Info</h2>
+        <button type="button" class="mini-btn" id="btnCpuInfoClose">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <h3>PicoRV32 in This Project</h3>
+          <p>PicoRV32 is not a classic 5-stage pipeline core. It is an FSM-based RV32 core that exposes the PCPI interface. In this project it provides the custom instruction request and is stalled externally by the wrapper through <code>pcpi_wait</code>.</p>
+        </div>
+        <div class="modal-section">
+          <h3>Reference 5-Stage Pipeline Diagram</h3>
+          <div class="pipeline-diagram">
+            <div class="pipeline-stage">IF<br><span>Instruction Fetch</span></div>
+            <div class="pipeline-arrow">-&gt;</div>
+            <div class="pipeline-stage">ID<br><span>Decode / Reg Read</span></div>
+            <div class="pipeline-arrow">-&gt;</div>
+            <div class="pipeline-stage">EX<br><span>Execute</span></div>
+            <div class="pipeline-arrow">-&gt;</div>
+            <div class="pipeline-stage">MEM<br><span>Memory Access</span></div>
+            <div class="pipeline-arrow">-&gt;</div>
+            <div class="pipeline-stage">WB<br><span>Write Back</span></div>
+          </div>
+          <p class="modal-note">This 5-stage diagram is included only as a reference model. Your actual integrated core here is PicoRV32, which does not literally operate as this pipeline.</p>
+        </div>
+        <div class="modal-section">
+          <h3>How the CPU Stalls Here</h3>
+          <ul class="modal-list">
+            <li>The CPU presents <code>pcpi_valid</code>, <code>pcpi_insn</code>, <code>pcpi_rs1</code>, and <code>pcpi_rs2</code>.</li>
+            <li>If the wrapper matches the custom instruction, it raises <code>pcpi_wait</code>.</li>
+            <li>While <code>pcpi_wait</code> is high, the CPU does not retire this instruction and does not move on to the next one.</li>
+            <li>Once wrapper finishes read, compute, and writeback, it raises <code>pcpi_ready</code> and <code>pcpi_wr</code>.</li>
+            <li>The CPU then consumes <code>pcpi_rd</code>, retires the instruction, and resumes normal flow.</li>
+          </ul>
+        </div>
+        <div class="modal-section">
+          <h3>Handoff Behavior</h3>
+          <p>Handoff means returning from accelerator-assisted execution back to ordinary CPU execution cleanly. In this project that handoff happens in <code>S_RESP</code> after writeback is complete and the wrapper produces the PCPI response.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="appGuideModal" class="modal" hidden>
+    <div class="modal-backdrop" id="appGuideBackdrop"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="appGuideTitle">
+      <div class="modal-head">
+        <h2 id="appGuideTitle">How to Use This Visualizer</h2>
+        <button type="button" class="mini-btn" id="btnAppGuideClose">Close</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <h3>Window Layout</h3>
+          <ul class="modal-list">
+            <li><strong>System Architecture:</strong> block-level integration view.</li>
+            <li><strong>Systolic Array View:</strong> PE-level operand movement and accumulation timing.</li>
+            <li><strong>State Transitions:</strong> current derived signals and wrapper FSM state.</li>
+            <li><strong>Event Log:</strong> readable trace of what each step is doing.</li>
+          </ul>
+        </div>
+        <div class="modal-section">
+          <h3>Controls</h3>
+          <ul class="modal-list">
+            <li><strong>Run:</strong> animate the full transaction automatically.</li>
+            <li><strong>Step:</strong> advance one state / compute tick.</li>
+            <li><strong>Step Back:</strong> go back one saved snapshot.</li>
+            <li><strong>Reset:</strong> return to <code>S_IDLE</code>.</li>
+          </ul>
+        </div>
+        <div class="modal-section">
+          <h3>Architecture View Tips</h3>
+          <ul class="modal-list">
+            <li>Click the small <code>i</code> buttons on arrow paths to see exactly which signals are carried on that path.</li>
+            <li>Click <strong>Architecture Info</strong> to get opcode, Q5.10, file references, and high-level system contract.</li>
+            <li>Click the CPU block <code>i</code> button for stall/handoff explanation and the 5-stage reference diagram.</li>
+          </ul>
+        </div>
+        <div class="modal-section">
+          <h3>Systolic View Tips</h3>
+          <p>In each active PE, <code>xin</code> and <code>yin</code> are the values entering that PE in the current cycle, while <code>xout</code> and <code>yout</code> show the forwarded values moving rightward and downward.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span>Based on <code>pcpi_tinyml_accel.v</code>, <code>matrix_accel_4x4_q5_10.v</code>, and <code>pe_cell_q5_10.v</code>.</span>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
