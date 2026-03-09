@@ -1,6 +1,6 @@
-# TinyML-Accelerator
+# EdgeMATX-TinyML-Accelerator
 
-TinyML-Accelerator is a Verilog-based RISC-V accelerator project that integrates a 4x4 fixed-point matrix-multiplication engine with PicoRV32 through the PCPI custom-instruction interface.
+EdgeMATX-TinyML-Accelerator is a Verilog-based RISC-V accelerator project that integrates a 4x4 fixed-point matrix-multiplication engine with PicoRV32 through the PCPI custom-instruction interface.
 
 The repository is organized around a simulation-first workflow:
 1. standalone accelerator validation,
