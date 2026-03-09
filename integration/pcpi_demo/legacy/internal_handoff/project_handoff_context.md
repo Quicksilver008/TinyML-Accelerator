@@ -27,7 +27,7 @@ Build a TinyML-oriented matrix accelerator flow on RISC-V (final target: Pynq-Z2
 
 ## Current Repo Snapshot
 
-- Repository root: `TinyML-Accelerator`
+- Repository root: `EdgeMATX-TinyML-Accelerator`
 - Active working branch: `main`
 - Public-facing repo polish now includes:
   - root `LICENSE` (MIT)
@@ -303,7 +303,7 @@ wsl bash -lc "riscv64-unknown-elf-gcc --version | head -n 1"
 
 ## Commands That Should Work Now
 
-From repo root (`TinyML-Accelerator`):
+From repo root (`EdgeMATX-TinyML-Accelerator`):
 
 1. Smoke demo:
 ```powershell
