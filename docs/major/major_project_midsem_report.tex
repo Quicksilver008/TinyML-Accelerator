@@ -804,6 +804,7 @@ The accelerator interacts with system memory through predefined memory regions u
 
 \begin{table}[H]
 \centering
+\caption{Memory layout used for matrix data exchange between CPU and accelerator.}
 \small
 \begin{tabular}{lll}
 \toprule
@@ -815,7 +816,6 @@ Matrix C & 0x200 -- 0x23C & Output elements of matrix C \\
 Sentinel & 0x00000000 & Completion marker for testbench \\
 \bottomrule
 \end{tabular}
-\caption{Memory layout used for matrix data exchange between CPU and accelerator.}
 \end{table}
 
 \section{Fixed-Point Arithmetic Contract}
@@ -880,6 +880,8 @@ The full verification infrastructure consists of the following reusable PowerShe
 
 \begin{table}[H]
 \centering
+\caption{Verification automation scripts and their roles.}
+\label{tab:scripts}
 \small
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.3}
@@ -900,8 +902,6 @@ run\_cycle\_compare.ps1         & Cycle measurement across all three execution p
 run\_pcpi\_custom\_cycle\_compare.ps1 & Live-input custom cycle comparison \\
 \bottomrule
 \end{tabularx}
-\caption{Verification automation scripts and their roles.}
-\label{tab:scripts}
 \end{table}
 
 % ----------------------------------------------------------------
@@ -933,6 +933,8 @@ Direct Verilog stimulus is applied to the accelerator inputs, and output values 
 
 \begin{table}[H]
 \centering
+\caption{Standalone accelerator test results by category.}
+\label{tab:standalone_tests}
 \small
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.3}
@@ -949,8 +951,6 @@ Negative-element operands      & 2  & PASS & 2026-03-05 \\
 \textbf{Total}                 & \textbf{19} & \textbf{PASS (19/19)} & \\
 \bottomrule
 \end{tabular}
-\caption{Standalone accelerator test results by category.}
-\label{tab:standalone_tests}
 \end{table}
 
 All 19 test cases passed, establishing unit-level confidence in the arithmetic correctness and timing of the accelerator datapath prior to CPU integration.
@@ -1072,6 +1072,8 @@ The regression suite covers a range of operand types to confirm correctness acro
 
 \begin{table}[H]
 \centering
+\caption{8-case PCPI integration regression results.}
+\label{tab:regression_tests}
 \small
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.3}
@@ -1089,8 +1091,6 @@ sparse\_input              & Sparse non-zero entries                     & PASS 
 zero\_matrix               & One operand all-zero                        & PASS \\
 \bottomrule
 \end{tabular}
-\caption{8-case PCPI integration regression results.}
-\label{tab:regression_tests}
 \end{table}
 
 \subsection{Professor Demonstration Cases}
@@ -1115,6 +1115,8 @@ This test specifically targets protocol robustness: ensuring no stale signals, n
 
 \begin{table}[H]
 \centering
+\caption{PCPI interface signals.}
+\label{tab:pcpi_signals}
 \small
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.3}
@@ -1131,8 +1133,6 @@ This test specifically targets protocol robustness: ensuring no stale signals, n
 \texttt{pcpi\_rd}    & Coprocessor $\to$ CPU & Scalar result value (unused in EdgeMATX) \\
 \bottomrule
 \end{tabular}
-\caption{PCPI interface signals.}
-\label{tab:pcpi_signals}
 \end{table}
 
 \begin{figure}[H]
@@ -1159,6 +1159,8 @@ The following protocol counters were observed and validated:
 
 \begin{table}[H]
 \centering
+\caption{Handoff test protocol counters: expected vs.\ observed.}
+\label{tab:handoff_counters}
 \small
 \setlength{\tabcolsep}{10pt}
 \renewcommand{\arraystretch}{1.3}
@@ -1173,8 +1175,6 @@ The following protocol counters were observed and validated:
 \texttt{c\_store\_count}        & 32 & 32 & Individual matrix-$C$ element writes ($2 \times 16$) \\
 \bottomrule
 \end{tabular}
-\caption{Handoff test protocol counters: expected vs.\ observed.}
-\label{tab:handoff_counters}
 \end{table}
 
 These results confirm:
@@ -1198,20 +1198,38 @@ Performance is measured by comparing the simulation cycle count required to comp
     \item \textbf{Software baseline (MUL enabled):} PCPI disabled, rv32im ISA, hardware multiply extension active.
 \end{enumerate}
 
-The measurement window starts when the firmware issues the computation trigger (custom instruction or software loop entry) and ends when the firmware writes the sentinel value to address \texttt{0x00000000}, which signals end of computation.
-This is captured by the testbench as:
+\subsection{Measurement Basis}
+
+The cycle counter \texttt{timeout\_cycles} is an integer incremented on every rising clock edge.
+Counting begins at the cycle when \texttt{resetn} is de-asserted (CPU comes out of reset) and
+stops when the CPU writes the sentinel value (\texttt{c[0]}) to address \texttt{0x00000000},
+which the testbench detects on the memory bus.
+The measured window therefore covers the complete firmware execution lifetime:
+
+\begin{enumerate}
+    \item \textbf{CPU boot phase:} 8 clock cycles of held reset followed by the \texttt{\_start} entry point (stack-pointer initialisation via a single \texttt{li sp, 0x3f0} instruction).
+    \item \textbf{Input copy phase} (\texttt{copy\_inputs}): 32 word-writes that DMA the compile-time matrix constants \texttt{a\_init[16]} and \texttt{b\_init[16]} from the firmware binary into the shared memory region (\texttt{0x100}--\texttt{0x17C}). This phase is \emph{identical} across all three configurations.
+    \item \textbf{Computation phase} (\texttt{run\_matmul}): the configuration-specific work --- a single PCPI custom instruction for the accelerator path, or the C triple-nested loop for the two software paths.
+    \item \textbf{Sentinel write:} one 32-bit store of \texttt{c[0]} to address \texttt{0x00000000}, which terminates counting.
+\end{enumerate}
+
+This is captured by every testbench as:
 
 \begin{lstlisting}[language={}]
 // Testbench cycle measurement output
-$display("TB_CYCLES matmul_to_sentinel_cycles=%0d", cycle_counter);
+$display("TB_CYCLES matmul_to_sentinel_cycles=%0d", timeout_cycles);
 \end{lstlisting}
 
 Automation scripts parse this line, extract the cycle value, and compute speedup ratios.
+Phases 1, 2, and 4 are fixed-cost and equal for all three configurations;
+only Phase 3 differs, so the speedup ratios isolate computation overhead cleanly.
 
 \subsection{Benchmark Case: \texttt{identity\_x\_sequence}}
 
 \begin{table}[H]
 \centering
+\caption{Measured simulation cycle counts for the \texttt{identity\_x\_sequence} benchmark.}
+\label{tab:cycle_comparison}
 \small
 \setlength{\tabcolsep}{5pt}
 \renewcommand{\arraystretch}{1.4}
@@ -1224,14 +1242,14 @@ Software baseline (no MUL)  & \texttt{ENABLE\_PCPI=0, ENABLE\_MUL=0} & rv32i  & 
 Software baseline (MUL)     & \texttt{ENABLE\_PCPI=0, ENABLE\_MUL=1} & rv32im &  7{,}975 \\
 \bottomrule
 \end{tabular}
-\caption{Measured simulation cycle counts for the \texttt{identity\_x\_sequence} benchmark.}
-\label{tab:cycle_comparison}
 \end{table}
 
 \subsection{Derived Speedups}
 
 \begin{table}[H]
 \centering
+\caption{Derived speedup values for the \texttt{identity\_x\_sequence} benchmark case.}
+\label{tab:speedups_identity}
 \small
 \setlength{\tabcolsep}{10pt}
 \renewcommand{\arraystretch}{1.4}
@@ -1244,8 +1262,6 @@ Accelerator vs.\ software MUL      & $7{,}975  / 673$ & $\mathbf{11.85\times}$ \
 Software MUL vs.\ software no-MUL  & $26{,}130 / 7{,}975$ & $3.28\times$ \\
 \bottomrule
 \end{tabular}
-\caption{Derived speedup values for the \texttt{identity\_x\_sequence} benchmark case.}
-\label{tab:speedups_identity}
 \end{table}
 
 \begin{figure}[H]
@@ -1262,6 +1278,8 @@ For the dense checked-in real-input profile, which contains non-trivial Q5.10 va
 
 \begin{table}[H]
 \centering
+\caption{Cycle counts for the dense \texttt{live\_real\_input.json} profile.}
+\label{tab:dense_profile}
 \small
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.3}
@@ -1274,8 +1292,6 @@ Software baseline (no MUL)  & 36{,}246   & $53.86\times$  \\
 Software baseline (MUL)     & 7{,}975    & $11.85\times$  \\
 \bottomrule
 \end{tabular}
-\caption{Cycle counts for the dense \texttt{live\_real\_input.json} profile.}
-\label{tab:dense_profile}
 \end{table}
 
 The dense profile achieves a \textbf{50x-class speedup} ($53.86\times$) over the rv32i no-MUL baseline because dense operands require a higher instruction count in the shift-and-add software multiply path, while the hardware accelerator's cycle count is \emph{data-independent}---it always completes in 673 cycles regardless of operand values.
@@ -1304,13 +1320,47 @@ The $11.85\times$ residual speedup reflects the loop-control and memory-access i
 The hardware accelerator's cycle count (673) is invariant to the numerical values of the input matrices.
 This provides predictable, worst-case-bound execution latency, which is a desirable property for real-time systems.
 
-\subsection{Measurement Fairness}
+\subsection{Benchmark Fairness and Standardization}
 
-\begin{itemize}
-    \item All three execution paths use \emph{identical input matrix data} for each comparison run.
-    \item The MUL baseline requires \emph{both} \texttt{ENABLE\_MUL=1} in the PicoRV32 core \emph{and} firmware compiled as \texttt{rv32im}; enabling only one of the two does not activate the hardware multiply path.
-    \item Cycle counts are parsed from the \texttt{TB\_CYCLES} log line and not manually observed.
-\end{itemize}
+\paragraph{Unified firmware source.}
+All three configurations compile the \emph{same} C source file
+(\texttt{firmware\_matmul\_unified.c}) using preprocessor flags
+(\texttt{MATMUL\_MODE\_ACCEL} / \texttt{MATMUL\_MODE\_SW}) that select the
+\texttt{run\_matmul} implementation at compile time.
+Entry point, stack setup, \texttt{copy\_inputs}, and sentinel write are
+bytecode-identical across all three binaries.
+
+\paragraph{Identical input data.}
+Matrix operands \texttt{a\_init[16]} and \texttt{b\_init[16]} are compile-time
+constants embedded in every firmware binary.
+Every configuration runs against the same bit-for-bit input values;
+there is no runtime randomness.
+
+\paragraph{Identical clock and reset conditions.}
+All testbenches use the same free-running clock and a fixed 8-cycle reset
+hold before \texttt{resetn = 1}.
+The counter starts at the same architectural moment (CPU out of reset) for
+every configuration.
+
+\paragraph{Equal constant-overhead phases.}
+The boot (Phase~1), input copy (Phase~2), and sentinel write (Phase~4)
+execute the same instruction sequences and access the same memory addresses
+in all three configurations.
+Their contribution cancels out in any speedup ratio computation.
+
+\paragraph{ISA difference is intentional, not a bias.}
+The MUL-enabled baseline deliberately uses \texttt{rv32im} with firmware
+compiled for \texttt{rv32im}; both the core and the compiler must agree or
+the multiply instruction is not exercised.
+This configuration represents the strongest realistic software competitor
+for the accelerator and is reported separately so its advantage over plain
+rv32i is also visible.
+
+\paragraph{Automated, non-manual measurement.}
+Cycle counts are extracted by parsing the \texttt{TB\_CYCLES} log line emitted
+by every testbench; no values are read manually from waveforms.
+The same automation script processes all three outputs, making the comparison
+reproducible and auditable.
 
 % ----------------------------------------------------------------
 \section{Consolidated Verification Summary}
@@ -1318,6 +1368,8 @@ This provides predictable, worst-case-bound execution latency, which is a desira
 
 \begin{table}[H]
 \centering
+\caption{Consolidated functional validation status across all verification layers.}
+\label{tab:consolidated_results}
 \small
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.4}
@@ -1338,12 +1390,12 @@ Professor cases       & run\_pcpi\_professor\_demo  & 2026-03-05 & PASS (5/5) \\
 One-command gate      & run\_pcpi\_local\_check     & 2026-03-05 & PASS \\
 \bottomrule
 \end{tabularx}
-\caption{Consolidated functional validation status across all verification layers.}
-\label{tab:consolidated_results}
 \end{table}
 
 \begin{table}[H]
 \centering
+\caption{Performance summary: speedup across both benchmark profiles.}
+\label{tab:speedup_summary}
 \small
 \setlength{\tabcolsep}{8pt}
 \renewcommand{\arraystretch}{1.4}
@@ -1355,8 +1407,6 @@ Accelerator vs.\ software (no MUL) & $38.83\times$ & $53.86\times$ \\
 Accelerator vs.\ software (MUL)    & $11.85\times$ & $11.85\times$ \\
 \bottomrule
 \end{tabular}
-\caption{Performance summary: speedup across both benchmark profiles.}
-\label{tab:speedup_summary}
 \end{table}
 
 Key observations:
