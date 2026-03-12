@@ -95,7 +95,9 @@ module tb_pipeline_pcpi_regression;
         end
     endtask
 
-    // Load a packed (2-elem/word) matrix into shared memory
+    // Load a packed (2-elem/word) matrix into shared memory.
+    // pcpi_tinyml_accel reads one 32-bit word per accel_mem transaction and
+    // unpacks both halves: [15:0]=even element, [31:16]=odd element.
     task automatic load_matrix;
         input [31:0]  base_byte;
         input [255:0] flat;

@@ -25,7 +25,7 @@ $CoreRtl = @(
     "accel_standalone/rtl/systolic_array_4x4_q5_10.v",
     "accel_standalone/rtl/issue_logic_4x4_q5_10.v",
     "accel_standalone/rtl/matrix_accel_4x4_q5_10.v",
-    "integration/pcpi_demo/rtl/pcpi_tinyml_accel.v",
+    "RISC-V/accelerator/rtl/pcpi_tinyml_accel.v",
     "RISC-V/pipeline_top/src/rv32_pipeline_pcpi_system.v"
 )
 

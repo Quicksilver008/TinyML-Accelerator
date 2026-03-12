@@ -36,6 +36,12 @@ pynq_z2_custom_core/build/*.out
 /*.vcd
 *.vvp
 
+# RISC-V simulation artifacts
+RISC-V/pipeline_top/*.vcd
+RISC-V/pipeline_top/firmware/*.map
+RISC-V/accelerator/results/*.out
+RISC-V/accelerator/results/*.log
+
 # LaTeX build artifacts
 docs/major/*.aux
 docs/major/*.bbl

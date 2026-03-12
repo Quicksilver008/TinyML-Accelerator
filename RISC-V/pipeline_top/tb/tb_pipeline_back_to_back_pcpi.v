@@ -126,7 +126,9 @@ module tb_pipeline_back_to_back_pcpi;
 
     // Load a 4x4 Q5.10 matrix from a 256-bit flat rep into shared memory.
     // Format: flat[(r*4+c)*16 +: 16] = element [r][c].
-    // Memory packed layout: 2 elements per 32-bit word (bits[31:16]=odd, [15:0]=even).
+    // Packed layout: 2 Q5.10 elements per 32-bit word ([31:16]=odd, [15:0]=even).
+    // pcpi_tinyml_accel reads one word per accel_mem transaction (8 words total)
+    // and unpacks both halves, so 8 memory transactions load all 16 elements.
     task automatic load_matrix_packed;
         input [31:0]  base_byte;
         input [255:0] flat;

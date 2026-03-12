@@ -77,17 +77,17 @@ module rv32_pipeline_pcpi_system #(
     localparam integer C_WORD_BASE = 32'h200 >> 2;   // = 128
 
     // Expose C as a flat 256-bit wire.
-    // Packed memory layout: 2 Q5.10 elements per 32-bit word.
+    // pcpi_tinyml_accel stores C packed: 2 Q5.10 elements per 32-bit word.
     //   mem[C_WORD_BASE + pair] = {C_odd[15:0], C_even[15:0]}
-    //   element linear index e = row*4+col → pair = e/2, half = e%2
+    //   element e = row*4+col -> pair = e/2; even->lo half, odd->hi half
     reg [255:0] mat_c_flat_r;
     integer c_i;
     always @(*) begin
         for (c_i = 0; c_i < 16; c_i = c_i + 1) begin
             if (c_i[0] == 1'b0)
-                mat_c_flat_r[c_i*16 +: 16] = mem[C_WORD_BASE + c_i/2][15:0];  // even elem → lo half
+                mat_c_flat_r[c_i*16 +: 16] = mem[C_WORD_BASE + c_i/2][15:0];   // even -> lo
             else
-                mat_c_flat_r[c_i*16 +: 16] = mem[C_WORD_BASE + c_i/2][31:16]; // odd  elem → hi half
+                mat_c_flat_r[c_i*16 +: 16] = mem[C_WORD_BASE + c_i/2][31:16];  // odd  -> hi
         end
     end
     assign mat_c_flat = mat_c_flat_r;
@@ -166,7 +166,8 @@ module rv32_pipeline_pcpi_system #(
 
     // -----------------------------------------------------------------------
     // PCPI coprocessor wrapper
-    // (same module as integration/pcpi_demo/rtl/pcpi_tinyml_accel.v)
+    // Canonical source: RISC-V/accelerator/rtl/pcpi_tinyml_accel.v
+    // (independent of integration/pcpi_demo/ — do not couple these)
     //
     // Reset note: resetn=0 means reset, resetn=1 means run — same polarity
     // as rv32_pipeline_top's rst signal. Direct connection is correct.
