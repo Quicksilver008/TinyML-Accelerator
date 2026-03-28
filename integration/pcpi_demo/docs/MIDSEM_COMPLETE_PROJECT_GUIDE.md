@@ -241,6 +241,59 @@ Outputs (per selected case):
 5. `integration/pcpi_demo/results/custom_cases/<case>_cycle_compare_summary.json`
 6. `integration/pcpi_demo/results/custom_cases/<case>_outputs_real.json` (per-variant output matrix in Q5.10 and real format)
 
+### 6.6 Additive NxN tiled matrix multiplication
+
+This branch also includes a new additive larger-matrix flow under:
+1. `integration/pcpi_demo/tiled_matmul/`
+
+Important framing:
+1. hardware is still only `4x4`
+2. wrapper RTL is unchanged
+3. larger square matrices are handled in software through tile packing, repeated custom-op invocations, and software accumulation
+
+New commands:
+
+1. Accelerator-backed tiled demo:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_matmul_demo.ps1 -CaseName square8_pattern -Mode accel
+```
+
+2. 3-way tiled compare:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_cycle_compare.ps1 -CaseName square16_pattern
+```
+
+3. Live real-valued tiled compare:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_live_cycle_compare.ps1
+```
+
+4. Aggregate tiled benchmark table:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_benchmark.ps1
+```
+
+Verified tiled cases on `feat/tiled-nxn-matmul`:
+1. `square4_identity_seq`
+2. `square8_pattern`
+3. `square10_edge` (padding case)
+4. `square16_pattern`
+5. `square32_pattern`
+
+Latest verified live tiled run:
+1. `live_eval_tiled` (`8x8` real input)
+2. accel `22159`
+3. sw-no-mul `182478`
+4. sw-mul `56161`
+
+Why the tiled results were not initially tabulated like the earlier 4x4 flow:
+1. the first tiled runner only emitted one summary per selected case
+2. there was no aggregate benchmark script yet
+3. `run_tiled_benchmark.ps1` now writes the consolidated table to:
+   - `integration/pcpi_demo/results/tiled_matmul/tiled_benchmark_summary.md`
+   - `integration/pcpi_demo/results/tiled_matmul/tiled_benchmark_summary.json`
+4. the timing window now starts at an explicit firmware start marker right before the tiled matmul region, so the benchmark excludes full-input copy/setup time
+
 ## 7) Cycle Comparison Meaning (for oral explanation)
 
 All three paths run on PicoRV32 family.
@@ -671,6 +724,25 @@ Important content:
 Why it matters:
 1. Helps explain future hardware roadmap decisions in a structured way during review or evaluation.
 2. Also documents practical deployment use cases and how the accelerator could be integrated with third-party CPU cores in either custom-instruction or future MMIO style.
+
+### 13.15 `integration/pcpi_demo/tiled_matmul/`
+
+Function:
+1. Adds a software-only tiling layer so the unchanged `4x4` accelerator can be reused for larger square matrix multiplication.
+
+Important files:
+1. `firmware/firmware_tiled_matmul.c`
+2. `firmware/tiled_matmul_lib.h`
+3. `firmware/sections.lds`
+4. `tests/cases_square.json`
+5. `tests/gen_tiled_case_header.py`
+6. `scripts/run_tiled_matmul_demo.ps1`
+7. `scripts/run_tiled_cycle_compare.ps1`
+8. `tb/tb_tiled_matmul_common.v`
+
+Why it matters:
+1. It proves larger matrices can be supported without changing the accelerator RTL.
+2. It keeps the original 4x4 integration flow untouched while adding a realistic software-layer scaling path.
 
 ## 14) Final Midsem Readiness Statement
 

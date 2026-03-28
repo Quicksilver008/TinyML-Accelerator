@@ -28,7 +28,7 @@ Build a TinyML-oriented matrix accelerator flow on RISC-V (final target: Pynq-Z2
 ## Current Repo Snapshot
 
 - Repository root: `EdgeMATX-TinyML-Accelerator`
-- Active working branch: `main`
+- Active working branch: `feat/tiled-nxn-matmul`
 - Public-facing repo polish now includes:
   - root `LICENSE` (MIT)
   - tightened root `README.md` intro/map for GitHub readers
@@ -248,6 +248,41 @@ What it enables:
 2. Keep baseline `cases.json` untouched.
 3. Generate per-case logs and cycle summary (`.md` + `.json`) under `results/custom_cases/`.
 
+### P) Additive NxN software-tiled matmul layer (new, feature branch only)
+
+Branch:
+1. `feat/tiled-nxn-matmul`
+
+Added:
+1. New subtree: `integration/pcpi_demo/tiled_matmul/`
+2. Tiled firmware source:
+   - `integration/pcpi_demo/tiled_matmul/firmware/firmware_tiled_matmul.c`
+3. Tiling library:
+   - `integration/pcpi_demo/tiled_matmul/firmware/tiled_matmul_lib.h`
+4. Dedicated tiled firmware build files:
+   - `integration/pcpi_demo/tiled_matmul/firmware/Makefile`
+   - `integration/pcpi_demo/tiled_matmul/firmware/sections.lds`
+5. Dedicated case generator + schema:
+   - `integration/pcpi_demo/tiled_matmul/tests/gen_tiled_cases.py`
+   - `integration/pcpi_demo/tiled_matmul/tests/gen_tiled_case_header.py`
+   - `integration/pcpi_demo/tiled_matmul/tests/cases_square.json`
+6. Dedicated tiled testbenches:
+   - `integration/pcpi_demo/tb/tb_tiled_matmul_common.v`
+   - `integration/pcpi_demo/tb/tb_picorv32_pcpi_tiled_matmul.v`
+   - `integration/pcpi_demo/tb/tb_picorv32_sw_tiled_matmul.v`
+   - `integration/pcpi_demo/tb/tb_picorv32_sw_tiled_matmul_mul.v`
+7. Dedicated tiled runners:
+   - `integration/pcpi_demo/scripts/run_tiled_matmul_demo.ps1`
+   - `integration/pcpi_demo/scripts/run_tiled_cycle_compare.ps1`
+
+Behavior:
+1. Hardware remains fixed at `4x4`.
+2. Wrapper/custom instruction contract remains unchanged.
+3. Larger square matrices are decomposed in software into repeated `4x4` tiles.
+4. Partial sums across tile-`k` are accumulated in software.
+5. Non-multiples of 4 use zero-padded edge tiles.
+6. New tiled firmware is linked and loaded at `0x4000` so accelerator staging buffers at `0x100/0x140/0x200` do not overwrite program text.
+
 ## Toolchain Status
 
 ### Windows native
@@ -363,6 +398,16 @@ python .\integration\pcpi_demo\tests\real_to_q5_10_case.py --clear-generated
 Input file:
 `integration/pcpi_demo/tests/live_real_input.json`
 
+2j. Tiled accelerator-backed demo:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_matmul_demo.ps1 -CaseName square8_pattern -Mode accel
+```
+
+2k. Tiled 3-way compare:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_cycle_compare.ps1 -CaseName square16_pattern
+```
+
 3. Generate one specific firmware case manually:
 ```powershell
 python .\integration\pcpi_demo\tests\gen_case_firmware.py --cases .\integration\pcpi_demo\tests\cases.json --case identity_x_sequence --firmware-out .\integration\pcpi_demo\firmware\firmware.S --meta-out .\integration\pcpi_demo\results\cases\identity_x_sequence.expected.json
@@ -447,6 +492,13 @@ Note: summary and per-case expected JSON are currently ignored via `.gitignore`.
     - fallback firmware references moved to: `integration/pcpi_demo/legacy/firmware/`
 19. Design-space and deployment tradeoff note:
     - `integration/pcpi_demo/docs/DESIGN_TRADEOFFS_AND_USE_CASES.md`
+20. Additive larger-matrix tiled layer note:
+    - `integration/pcpi_demo/tiled_matmul/README.md`
+21. Tiled live-input + benchmark additions:
+    - `integration/pcpi_demo/scripts/run_tiled_live_cycle_compare.ps1`
+    - `integration/pcpi_demo/scripts/run_tiled_benchmark.ps1`
+    - `integration/pcpi_demo/tiled_matmul/TILED_MATMUL_EXPLAINED.md`
+    - benchmark output: `integration/pcpi_demo/results/tiled_matmul/tiled_benchmark_summary.md`
 
 ## Immediate Next Work (Do In Order)
 
@@ -515,6 +567,20 @@ Validated on 2026-03-05:
      - `live_eval_active`: accel `673`, sw_nomul `36246`, sw_mul `7975`
      - `sw_nomul/accel=53.8574x`, `sw_mul/accel=11.8499x`
      - current `live_real_input.json` is pre-seeded for near-50x no-MUL live evaluation demo
+10. Tiled NxN layer:
+   - 4x4 compatibility: `square4_identity_seq` PASS via new tiled accelerator path (`4055` cycles)
+   - 8x8 compare: accel `25657`, sw_nomul `268104`, sw_mul `59591`
+   - 10x10 compare: accel `100646`, sw_nomul `519679`, sw_mul `113784`
+   - 16x16 compare: accel `183119`, sw_nomul `2129240`, sw_mul `450759`
+   - 32x32 compare: accel `1365473`, sw_nomul `16876607`, sw_mul `3505993`
+11. Tiled live real-input 3-way run:
+   - command: `.\integration\pcpi_demo\scripts\run_tiled_live_cycle_compare.ps1`
+   - result: PASS
+   - measured: `live_eval_tiled` (`8x8`) accel `25657`, sw_nomul `185976`, sw_mul `59591`
+12. Tiled aggregate benchmark table:
+   - command: `.\integration\pcpi_demo\scripts\run_tiled_benchmark.ps1`
+   - result: PASS
+   - output: `integration/pcpi_demo/results/tiled_matmul/tiled_benchmark_summary.md`
 
 ## Not In Scope Yet
 

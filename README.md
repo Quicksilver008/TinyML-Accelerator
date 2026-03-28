@@ -15,6 +15,7 @@ The repository is organized around a simulation-first workflow:
 3. Scripted regression, handoff validation, and 3-way cycle comparison.
 4. Live real-input flow for evaluator-provided matrices.
 5. Beginner-focused documentation for wrapper RTL, accelerator RTL, and systolic-array concepts.
+6. Additive NxN software-tiling layer that reuses the unchanged 4x4 accelerator for larger square matrices.
 
 ## Current Status
 
@@ -32,6 +33,7 @@ The repository is organized around a simulation-first workflow:
 5. `RISC-V/`: vendored RV32I core reference implementation.
 6. `midsem_sim/`: compatibility shim for older standalone-flow paths.
 7. `integration/pcpi_demo/legacy/`: fallback/reference assets separated from active flow.
+8. `integration/pcpi_demo/tiled_matmul/`: additive larger-matrix software tiling layer on top of the fixed 4x4 accelerator.
 
 ## Start Here
 
@@ -220,6 +222,58 @@ Latest verified (2026-03-05):
 5. `sw_mul/accel=11.8499x`
 6. `sw_nomul/sw_mul=3.2765x`
 
+## Tiled NxN Matmul Layer
+
+The existing RTL remains a fixed `4x4` accelerator. Larger square matrices are supported additively through a new software tiling layer under `integration/pcpi_demo/tiled_matmul/`.
+
+What stays unchanged:
+1. `accel_standalone/rtl/*`
+2. `integration/pcpi_demo/rtl/pcpi_tinyml_accel.v`
+3. all existing 4x4 smoke, regression, handoff, custom-case, and cycle-compare scripts
+
+What the new layer adds:
+1. `NxN` square matmul API in bare-metal C
+2. zero-padded edge handling for non-multiples of 4
+3. software-managed accumulation across tile-`k`
+4. dedicated TBs and 3-way cycle-compare scripts for `8x8`, `16x16`, `32x32`, and edge-sized cases
+
+Run one tiled accelerator demo:
+
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_matmul_demo.ps1 -CaseName square8_pattern -Mode accel
+```
+
+Run one tiled 3-way compare:
+
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_cycle_compare.ps1 -CaseName square16_pattern
+```
+
+Run live real-valued square input through all 3 tiled variants:
+
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_live_cycle_compare.ps1
+```
+
+Generate the aggregate tiled benchmark table:
+
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_benchmark.ps1
+```
+
+This tiled flow now produces:
+1. one per-case cycle/speedup summary per tiled case
+2. one per-case real-output JSON file
+3. one consolidated benchmark table under `integration/pcpi_demo/results/tiled_matmul/tiled_benchmark_summary.md`
+
+Latest verified on branch `feat/tiled-nxn-matmul`:
+1. `square4_identity_seq`: PASS through the new tiled path
+2. `square8_pattern`: PASS (`accel=22159`, `sw_nomul=264606`, `sw_mul=56161`)
+3. `square10_edge`: PASS (`accel=95244`, `sw_nomul=514271`, `sw_mul=108444`)
+4. `square16_pattern`: PASS (`accel=169453`, `sw_nomul=2115566`, `sw_mul=437153`)
+5. `square32_pattern`: PASS (`accel=1311105`, `sw_nomul=16822235`, `sw_mul=3451681`)
+6. live real-valued `8x8` tiled run: PASS (`accel=22159`, `sw_nomul=182478`, `sw_mul=56161`)
+
 ## PCPI Professor Demo Cases
 
 Run from repository root:
@@ -333,6 +387,10 @@ python .\integration\pcpi_demo\tests\real_to_q5_10_case.py --clear-generated
    - `integration/pcpi_demo/visualizer/index.html`
    - Production URL: `https://tinyml-pcpi-visualizer.vercel.app`
    - It now includes per-arrow signal inspection, CPU stall/handoff guidance, project-level architecture info, PE dataflow view, step-back control, and draggable split-pane layout.
+10. Additive larger-matrix tiling flow is at:
+   - `integration/pcpi_demo/tiled_matmul/README.md`
+   - `integration/pcpi_demo/scripts/run_tiled_matmul_demo.ps1`
+   - `integration/pcpi_demo/scripts/run_tiled_cycle_compare.ps1`
 
 Generated artifacts:
 

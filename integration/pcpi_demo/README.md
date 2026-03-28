@@ -154,6 +154,66 @@ This run reports:
 3. accelerator custom-instruction path
 4. speedups between all three.
 
+## Additive NxN Tiled Layer
+
+Existing 4x4 flows above are unchanged.
+
+New subtree:
+1. `integration/pcpi_demo/tiled_matmul/`
+
+What it does:
+1. keeps the existing `4x4` RTL and PCPI wrapper unchanged
+2. adds a software tiling layer for square `NxN` matrix multiplication
+3. packs logical `4x4` tiles into the current staging buffers
+4. accumulates partial sums across tile-`k` in software
+5. zero-pads edge tiles when `N % 4 != 0`
+
+New commands:
+
+Accelerator-backed tiled demo:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_matmul_demo.ps1 -CaseName square8_pattern -Mode accel
+```
+
+3-way tiled compare:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_cycle_compare.ps1 -CaseName square16_pattern
+```
+
+Live real-valued square input across all 3 tiled variants:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_live_cycle_compare.ps1
+```
+
+Aggregate tiled benchmark table:
+```powershell
+.\integration\pcpi_demo\scripts\run_tiled_benchmark.ps1
+```
+
+Validated cases on `feat/tiled-nxn-matmul`:
+1. `square4_identity_seq`
+2. `square8_pattern`
+3. `square10_edge`
+4. `square16_pattern`
+5. `square32_pattern`
+
+Latest verified tiled benchmark table:
+
+| Case | Dim | Accel Cycles | SW no-MUL Cycles | SW MUL Cycles | SW no-MUL / Accel | SW MUL / Accel |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `square8_pattern` | 8 | 22159 | 264606 | 56161 | 11.9412x | 2.5345x |
+| `square10_edge` | 10 | 95244 | 514271 | 108444 | 5.3995x | 1.1386x |
+| `square16_pattern` | 16 | 169453 | 2115566 | 437153 | 12.4847x | 2.5798x |
+| `square32_pattern` | 32 | 1311105 | 16822235 | 3451681 | 12.8306x | 2.6327x |
+| `live_eval_tiled` (`8x8` real input) | 8 | 22159 | 182478 | 56161 | 8.2349x | 2.5345x |
+
+Why tiled results were not tabulated at first:
+1. the original tiled flow only generated per-case compare summaries
+2. it did not yet have an aggregate collector like the 4x4 benchmark flow
+3. `run_tiled_benchmark.ps1` now generates the consolidated table at:
+   - `integration/pcpi_demo/results/tiled_matmul/tiled_benchmark_summary.md`
+   - `integration/pcpi_demo/results/tiled_matmul/tiled_benchmark_summary.json`
+
 Latest verified cycle values (2026-03-05):
 
 1. Accelerator: `673`
@@ -277,6 +337,9 @@ Artifacts:
 - `integration/pcpi_demo/results/custom_cases/*_cycle_compare_summary.md`
 - `integration/pcpi_demo/results/custom_cases/*_cycle_compare_summary.json`
 - `integration/pcpi_demo/results/custom_cases/*_outputs_real.json`
+- `integration/pcpi_demo/results/tiled_matmul/*.log`
+- `integration/pcpi_demo/results/tiled_matmul/*_cycle_compare_summary.md`
+- `integration/pcpi_demo/results/tiled_matmul/*_cycle_compare_summary.json`
 - `integration/pcpi_demo/docs/MIDSEM_COMPLETE_PROJECT_GUIDE.md`
 - `integration/pcpi_demo/simulation/gtkwave/pcpi_demo_signals.gtkw`
 - `integration/pcpi_demo/simulation/gtkwave/pcpi_handoff_signals.gtkw`
@@ -300,6 +363,8 @@ Interactive architecture + handshake visualizer app:
 - `integration/pcpi_demo/visualizer/index.html`
 - Production URL: `https://tinyml-pcpi-visualizer.vercel.app`
 - Features now include per-arrow signal info popups, CPU stall/handoff explanation, architecture/project info modals, PE-level operand movement, and step-back navigation.
+- Dedicated additive larger-matrix tiling docs:
+  - `integration/pcpi_demo/tiled_matmul/README.md`
 
 Architecture contract draft for future SoC top-level:
 
